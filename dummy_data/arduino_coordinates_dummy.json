@@ -1,0 +1,19 @@
+{
+  "_note": "테스트용 더미 좌표 데이터. 현재 API 명세서(IF-SRV-ARD-001)에는 좌표 메시지가 정의되어 있지 않고 hw_state 상태 라벨만 정의되어 있어, 이 파일은 OwlServer가 실제로 송신하는 데이터가 아니라 아두이노 측 서보 추적 로직을 독립적으로 테스트하기 위한 참고용 샘플이다.",
+  "resolution": { "width": 640, "height": 480 },
+  "fps_equivalent": 2,
+  "duration_seconds": 5,
+  "frame_count": 10,
+  "frames": [
+    { "frame": 1,  "timestamp_ms": 0,    "x": 320, "y": 320 },
+    { "frame": 2,  "timestamp_ms": 500,  "x": 438, "y": 305 },
+    { "frame": 3,  "timestamp_ms": 1000, "x": 510, "y": 265 },
+    { "frame": 4,  "timestamp_ms": 1500, "x": 510, "y": 215 },
+    { "frame": 5,  "timestamp_ms": 2000, "x": 438, "y": 175 },
+    { "frame": 6,  "timestamp_ms": 2500, "x": 320, "y": 160 },
+    { "frame": 7,  "timestamp_ms": 3000, "x": 202, "y": 175 },
+    { "frame": 8,  "timestamp_ms": 3500, "x": 130, "y": 215 },
+    { "frame": 9,  "timestamp_ms": 4000, "x": 130, "y": 265 },
+    { "frame": 10, "timestamp_ms": 4500, "x": 202, "y": 305 }
+  ]
+}

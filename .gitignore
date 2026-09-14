@@ -1,0 +1,17 @@
+bin/
+obj/
+data/captures/
+*.user
+.vs/
+
+# ddl 쿼리 ignore
+sql/
+
+# 주요 키 ignore
+appsettings.json
+
+# 네트워크 테스트 스텁 ignore
+PiStub/
+
+# plan
+owl_csharp_server_plan.md
