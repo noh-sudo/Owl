@@ -54,6 +54,6 @@ public sealed class MySqlSettings
 /// </summary>
 public sealed class ArduinoSerialSettings
 {
-    public string PortName { get; set; } = "COM3";
+    public string PortName { get; set; } = "COM5";
     public int BaudRate { get; set; } = 9600;
 }
