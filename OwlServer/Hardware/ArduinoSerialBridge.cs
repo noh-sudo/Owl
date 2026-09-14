@@ -9,23 +9,29 @@ using OwlServer.Utils;
 namespace OwlServer.Hardware;
 
 /// <summary>
-/// Server -> Arduino coordinate channel over a wired USB-serial (COM port)
-/// connection, separate from the TCP-based <see cref="ArduinoBridge"/> which
-/// still carries hw_state status labels over port 6001. Coordinates go over
-/// serial because that's how the Arduino/turret hardware receives them,
-/// matching 요구사항명세서 서버-07 / 아두이노-01,02 ("좌표 데이터를 수신하고
-/// 파싱한다").
+/// Server -> Arduino serial (COM port) channel - the counterpart to the
+/// TCP-based <see cref="ArduinoBridge"/>, which still carries hw_state status
+/// labels over port 6001 for the test-hardware bridge. This class carries two
+/// kinds of plain, newline-terminated lines instead, matching 요구사항명세서
+/// 서버-07 / 아두이노-01,02 ("좌표 데이터를 수신하고 파싱한다"):
 ///
-/// Wire format is a plain newline-terminated line - "POS,x,y\n" - rather than
-/// the OWL1/OWLD framing used elsewhere: that framing exists to solve TCP's lack
-/// of message boundaries for JSON/binary payloads, but a single serial link
-/// carries exactly one stream to one microcontroller, and the Arduino sketch
-/// reads with Serial.readStringUntil('\n') + a split on ',' - no length prefix
-/// or JSON parser needed on that side. The sketch is expected to reply with an
-/// ACK line ("ACK,...") per the wire format both <see cref="SendTargetCoordinate"/>
-/// (single live coordinate, e.g. from a Pi detection_event) and
-/// <see cref="SendCoordinatesAsync"/> (a whole recorded/dummy coordinate batch,
-/// e.g. dummy_data/arduino_coordinates_dummy.json) use.
+///   "POS,x,y\n"                     - target coordinate (SendTargetCoordinate,
+///                                      SendCoordinatesAsync)
+///   "DEC,APPROVED\n" / "DEC,STOPPED\n" - WPF operator's approve/stop decision
+///                                      (SendDecision, API spec IF-WPF-SRV-002
+///                                      DecisionMessage.Approved). Status label
+///                                      only, same as HwState.Approved/Stopped
+///                                      sent over the TCP bridge - this does not
+///                                      implement any actual firing control (dev
+///                                      plan §1 안전 범위).
+///
+/// This plain-line format is used rather than the OWL1/OWLD framing used
+/// elsewhere: that framing exists to solve TCP's lack of message boundaries for
+/// JSON/binary payloads, but a single serial link carries exactly one stream to
+/// one microcontroller, and the Arduino sketch reads with
+/// Serial.readStringUntil('\n') + a split on ',' - no length prefix or JSON
+/// parser needed on that side. The sketch is expected to reply with an ACK line
+/// ("ACK,...") to any of the above.
 ///
 /// Every open/write runs on a background Task rather than the calling thread, so
 /// a slow, busy, or momentarily unplugged port can never stall detection
@@ -70,6 +76,20 @@ public sealed class ArduinoSerialBridge : IDisposable
     public void SendTargetCoordinate(int x, int y)
     {
         Task.Run(() => WriteCoordinateLine(x, y));
+    }
+
+    /// <summary>
+    /// Queues "DEC,APPROVED" or "DEC,STOPPED" to be written to the serial port,
+    /// mirroring the WPF operator's approve/stop decision (API spec IF-WPF-SRV-002,
+    /// DecisionMessage.Approved) straight to the Arduino/test rig over serial -
+    /// same fire-and-forget pattern as SendTargetCoordinate. This is a status
+    /// label only, same as HwState.Approved/Stopped sent over the TCP bridge
+    /// (ArduinoBridge) - it does not implement any actual firing control (dev
+    /// plan §1 안전 범위).
+    /// </summary>
+    public void SendDecision(bool approved)
+    {
+        Task.Run(() => WriteDecisionLine(approved));
     }
 
     /// <summary>
@@ -134,6 +154,30 @@ public sealed class ArduinoSerialBridge : IDisposable
                 _port.WriteLine(message);
                 var context = frameNumber is { } f ? $"frame={f}, time={timestampMs}ms, " : "";
                 Logger.Info($"[SEND HW-Serial {_port.PortName}] TX | {context}{message}");
+            }
+            catch (Exception ex) when (ex is IOException or TimeoutException or InvalidOperationException or UnauthorizedAccessException)
+            {
+                Logger.Warn($"Failed to write to serial port {_port.PortName}: {ex.Message}");
+                CloseQuietly();
+            }
+        }
+    }
+
+    private void WriteDecisionLine(bool approved)
+    {
+        lock (_lock)
+        {
+            if (!_port.IsOpen && !TryOpen())
+            {
+                return;
+            }
+
+            var message = $"DEC,{(approved ? "APPROVED" : "STOPPED")}";
+
+            try
+            {
+                _port.WriteLine(message);
+                Logger.Info($"[SEND HW-Serial {_port.PortName}] TX | {message}");
             }
             catch (Exception ex) when (ex is IOException or TimeoutException or InvalidOperationException or UnauthorizedAccessException)
             {

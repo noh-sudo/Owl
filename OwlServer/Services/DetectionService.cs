@@ -127,6 +127,8 @@ public sealed class DetectionService(
         await arduinoBridge
             .BroadcastStateAsync(decision.Approved ? HwState.Approved : HwState.Stopped, ct)
             .ConfigureAwait(false);
+
+        arduinoSerialBridge.SendDecision(decision.Approved);
     }
 
     private static DateTime ParseTimestamp(string raw)
