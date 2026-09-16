@@ -1,0 +1,23 @@
+description: Ultralytics YOLO11n model trained on data_small.yaml
+author: Ultralytics
+date: '2026-09-11T10:41:44.132628+09:00'
+version: 8.4.146
+license: AGPL-3.0 License (https://ultralytics.com/license)
+docs: https://docs.ultralytics.com
+stride: 32
+task: detect
+head: Detect
+batch: 1
+imgsz:
+- 320
+- 320
+names:
+  0: person
+  1: deer
+  2: pig
+  3: raccoon
+args:
+  batch: 1
+  quantize: null
+channels: 3
+end2end: false
