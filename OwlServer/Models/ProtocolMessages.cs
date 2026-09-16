@@ -68,6 +68,60 @@ public sealed class DecisionMessage
     public bool Approved { get; set; }
 }
 
+/// <summary>
+/// Raspberry Pi -> Server, Data Socket (port 5000). Extension beyond the frozen
+/// API spec, not tied to detection_event - sent repeatedly (rate-limited on the
+/// Pi side) while an object is being tracked, independent of the Pi's
+/// event_active/cooldown/min_interval state machine. Carries no blob (BlobSize
+/// = 0): this is a pure continuous coordinate feed for the Arduino servo, not a
+/// DB-logged event (see DetectionService.HandleTrackingCoordinate - no cam_log
+/// write, no WPF broadcast, straight to ArduinoSerialBridge).
+/// </summary>
+public sealed class TrackingCoordinateMessage
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "tracking_coordinate";
+
+    [JsonPropertyName("x")]
+    public int X { get; set; }
+
+    [JsonPropertyName("y")]
+    public int Y { get; set; }
+
+    /// <summary>
+    /// Ultralytics tracker ID (model.track(persist=True) - box.id) for the same
+    /// physical object across frames. Null when the tracker hasn't confirmed an
+    /// ID yet for this box (common for the first frame or two after a track
+    /// starts) - the coordinate is still relayed to Arduino in that case, it's
+    /// just not counted toward the sustained-tracking timer below.
+    /// </summary>
+    [JsonPropertyName("track_id")]
+    public int? TrackId { get; set; }
+}
+
+/// <summary>
+/// Server -> WPF. Not part of the frozen API spec - added so the server (not
+/// WPF on its own) is authoritative over the LED state machine:
+///   detection_log (existing)      -> WPF sets LED yellow (on first detection)
+///   change_led / color=red        -> same track_id sustained >= N seconds
+///   change_led / color=green      -> no track_id seen for the "lost" timeout
+///                                     (DetectionService's tracking watchdog)
+/// </summary>
+public sealed class ChangeLedMessage
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = "change_led";
+
+    [JsonPropertyName("color")]
+    public string Color { get; set; } = LedColor.Green;
+}
+
+public static class LedColor
+{
+    public const string Red = "red";
+    public const string Green = "green";
+}
+
 /// <summary>Server -> WPF (IF-SRV-WPF-004).</summary>
 public sealed class SystemStatusMessage
 {

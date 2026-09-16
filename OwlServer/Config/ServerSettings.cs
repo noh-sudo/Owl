@@ -8,6 +8,7 @@ public sealed class ServerSettings
     public StorageSettings Storage { get; set; } = new();
     public MySqlSettings MySql { get; set; } = new();
     public ArduinoSerialSettings ArduinoSerial { get; set; } = new();
+    public TrackingSettings Tracking { get; set; } = new();
 }
 
 public sealed class PortSettings
@@ -56,4 +57,19 @@ public sealed class ArduinoSerialSettings
 {
     public string PortName { get; set; } = "COM5";
     public int BaudRate { get; set; } = 9600;
+}
+
+/// <summary>
+/// Server-side LED state machine driven by the Pi's tracking_coordinate stream
+/// (single target only - no multi-object aggregation). SustainedSeconds is the
+/// yellow -> red threshold (same track_id seen continuously that long);
+/// LostTimeoutSeconds is how long with no tracking_coordinate at all before the
+/// server considers the target gone and reports back to green. LostTimeoutSeconds
+/// mirrors the Pi's own --cooldown default (3s) so a brief occlusion on the Pi
+/// side doesn't also flicker the LED green on the server side.
+/// </summary>
+public sealed class TrackingSettings
+{
+    public double SustainedSeconds { get; set; } = 2.0;
+    public double LostTimeoutSeconds { get; set; } = 3.0;
 }

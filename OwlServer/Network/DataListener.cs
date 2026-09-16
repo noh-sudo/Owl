@@ -10,8 +10,10 @@ namespace OwlServer.Network;
 
 /// <summary>
 /// Raspberry Pi -> Server detection/data socket (port 5000, API spec IF-PI-SRV-002).
-/// Reads OWLD messages; only "detection_event" is expected here, sent once per
-/// no-detection -> detection transition (dev plan §7).
+/// Reads OWLD messages. "detection_event" fires once per no-detection -> detection
+/// transition (dev plan §7); "tracking_coordinate" is a separate, much higher-rate
+/// stream (Pi-side rate-limited, but still up to ~10-15/sec) carrying no blob, used
+/// purely to keep the Arduino servo tracking a target that's still in frame.
 /// </summary>
 public sealed class DataListener(IOptions<ServerSettings> settings, DetectionService detectionService, LogService logService)
     : TcpServerBase(settings.Value.Ports.RaspberryPiDataPort, "DataListener")
@@ -28,9 +30,19 @@ public sealed class DataListener(IOptions<ServerSettings> settings, DetectionSer
             while (true)
             {
                 var message = await PacketProtocol.ReadMessageAsync(stream, ct).ConfigureAwait(false);
-                var blobNote = message.HasBlob ? $" (+blob {message.Blob.Length}B)" : "";
-                Logger.Info($"[RECV Pi-Data] {message.Json}{blobNote}");
-                await DispatchAsync(message, ct).ConfigureAwait(false);
+                var type = PeekType(message.Json);
+
+                // tracking_coordinate arrives up to ~10-15x/sec - logging every one
+                // would drown out everything else on the console. ArduinoSerialBridge
+                // already logs each accepted "[SEND HW-Serial ...] TX | POS,x,y" write,
+                // so the traffic is still visible, just not double-logged here.
+                if (type != "tracking_coordinate")
+                {
+                    var blobNote = message.HasBlob ? $" (+blob {message.Blob.Length}B)" : "";
+                    Logger.Info($"[RECV Pi-Data] {message.Json}{blobNote}");
+                }
+
+                await DispatchAsync(type, message, ct).ConfigureAwait(false);
             }
         }
         finally
@@ -40,23 +52,31 @@ public sealed class DataListener(IOptions<ServerSettings> settings, DetectionSer
         }
     }
 
-    private async Task DispatchAsync(OwlMessage message, CancellationToken ct)
+    private static string PeekType(string json)
     {
-        string type;
         try
         {
-            type = JsonSerializer.Deserialize<MessageEnvelope>(message.Json)?.Type ?? string.Empty;
+            return JsonSerializer.Deserialize<MessageEnvelope>(json)?.Type ?? string.Empty;
         }
         catch (JsonException ex)
         {
-            Logger.Error("Malformed JSON on data socket, dropping.", ex);
-            return;
+            Logger.Error("Malformed JSON on data socket.", ex);
+            return string.Empty;
         }
+    }
 
+    private async Task DispatchAsync(string type, OwlMessage message, CancellationToken ct)
+    {
         switch (type)
         {
             case "detection_event":
                 await detectionService.HandleDetectionEventAsync(message, ct).ConfigureAwait(false);
+                break;
+            case "tracking_coordinate":
+                detectionService.HandleTrackingCoordinate(message.Json);
+                break;
+            case "":
+                // Already logged by PeekType (malformed JSON) - nothing more to do.
                 break;
             default:
                 Logger.Warn($"Unrecognized message type '{type}' on data socket, ignoring.");
