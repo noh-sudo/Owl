@@ -10,6 +10,12 @@ sql/
 # 주요 키 ignore
 appsettings.json
 
+# python 캐시
+__pycache__/
+
+#캡쳐 저장 경로
+captures/
+
 # 네트워크 테스트 스텁 ignore
 PiStub/
 
