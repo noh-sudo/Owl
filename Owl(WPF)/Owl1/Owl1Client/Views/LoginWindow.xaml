@@ -1,0 +1,99 @@
+<Window x:Class="Owl1Client.Views.LoginWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        mc:Ignorable="d"
+        Title="올빼미 하나 로그인 - 터렛 관제 시스템"
+        Height="640" Width="420"
+        WindowStartupLocation="CenterScreen"
+        ResizeMode="NoResize"
+        FontFamily="Segoe UI"
+        Background="{StaticResource OliveDarkBrush}">
+
+    <Grid>
+        <!-- 우측 상단 설정(서버 IP/Port) 아이콘 -->
+        <Button x:Name="SettingsButton" Style="{StaticResource IconButtonStyle}" Content="&#9881;"
+                Foreground="#C9D0B8"
+                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,16,16,0"
+                Click="SettingsButton_Click" ToolTip="서버 접속 설정"/>
+
+        <Popup x:Name="ServerSettingsPopup" PlacementTarget="{Binding ElementName=SettingsButton}"
+               Placement="Bottom" StaysOpen="False" AllowsTransparency="True"
+               DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+            <Border Background="White" CornerRadius="8" Padding="16" Width="240" Margin="0,6,0,0">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="18" ShadowDepth="2" Opacity="0.3" Color="Black"/>
+                </Border.Effect>
+                <StackPanel>
+                    <TextBlock Text="서버 접속 설정" FontWeight="Bold" FontSize="{StaticResource FontSize16}"
+                               Foreground="{StaticResource TextDarkBrush}" Margin="0,0,0,12"/>
+
+                    <TextBlock Text="서버 주소" Style="{StaticResource FieldLabelStyle}"/>
+                    <TextBox Style="{StaticResource FieldTextBoxStyle}" Margin="0,0,0,10"
+                             Text="{Binding ServerIp, UpdateSourceTrigger=PropertyChanged}"/>
+
+                    <TextBlock Text="포트" Style="{StaticResource FieldLabelStyle}"/>
+                    <TextBox Style="{StaticResource FieldTextBoxStyle}" Margin="0,0,0,14"
+                             Text="{Binding ServerPortText, UpdateSourceTrigger=PropertyChanged}"/>
+
+                    <Button Content="확인" Style="{StaticResource OliveButtonStyle}" Click="CloseSettingsPopup_Click"/>
+                </StackPanel>
+            </Border>
+        </Popup>
+
+        <!-- 중앙 컨텐츠: 올빼미 아이콘 + 로그인 카드 -->
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+
+            <!-- 올빼미 얼굴 실루엣 아이콘 (벡터 도형) -->
+            <Grid Width="140" Height="118" Margin="0,0,0,26">
+                <Ellipse Width="140" Height="112" Fill="{StaticResource OwlSilhouetteBrush}" VerticalAlignment="Top"/>
+                <Ellipse Width="46" Height="46" Fill="{StaticResource OliveDarkBrush}"
+                         HorizontalAlignment="Left" VerticalAlignment="Top" Margin="15,26,0,0"/>
+                <Ellipse Width="46" Height="46" Fill="{StaticResource OliveDarkBrush}"
+                         HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,26,15,0"/>
+                <Ellipse Width="18" Height="18" Fill="{StaticResource OwlSilhouetteBrush}"
+                         HorizontalAlignment="Left" VerticalAlignment="Top" Margin="29,41,0,0"/>
+                <Ellipse Width="18" Height="18" Fill="{StaticResource OwlSilhouetteBrush}"
+                         HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,41,29,0"/>
+                <Polygon Points="0,0 18,0 9,18" Fill="{StaticResource OliveDarkBrush}"
+                         HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,62,0,0"/>
+            </Grid>
+
+            <!-- 로그인 카드 -->
+            <Border Style="{StaticResource CardBorderStyle}" Width="340">
+                <StackPanel>
+                    <TextBlock Text="올빼미 하나 로그인" FontSize="{StaticResource FontSize26}" FontWeight="Bold"
+                               Foreground="{StaticResource TextDarkBrush}" HorizontalAlignment="Center"/>
+                    <TextBlock Text="터렛 관제 시스템" FontSize="{StaticResource FontSize16}"
+                               Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center" Margin="0,3,0,22"/>
+
+                    <TextBlock Text="아이디" Style="{StaticResource FieldLabelStyle}"/>
+                    <TextBox x:Name="UsernameBox" Style="{StaticResource PlaceholderTextBoxStyle}"
+                             Tag="아이디를 입력하세요" Margin="0,0,0,14"
+                             Text="{Binding Username, UpdateSourceTrigger=PropertyChanged}"/>
+
+                    <TextBlock Text="비밀번호" Style="{StaticResource FieldLabelStyle}"/>
+                    <PasswordBox x:Name="PasswordBox" Style="{StaticResource FieldPasswordBoxStyle}"
+                                 KeyDown="PasswordBox_KeyDown"/>
+
+                    <TextBlock Text="{Binding ErrorMessage}" Foreground="{StaticResource DangerRedBrush}"
+                               TextWrapping="Wrap" FontSize="{StaticResource FontSize14}" Margin="2,8,0,0" MinHeight="16"
+                               Visibility="{Binding HasError, Converter={StaticResource BoolToVisibilityConverter}}"/>
+
+                    <Button x:Name="LoginButton" Style="{StaticResource OliveButtonStyle}" FontSize="{StaticResource FontSize18}"
+                            Margin="0,16,0,0" Click="LoginButton_Click"
+                            IsEnabled="{Binding IsBusy, Converter={StaticResource InverseBoolConverter}}">
+                        <TextBlock Text="{Binding IsBusy, Converter={StaticResource BusyToLoginTextConverter}}"/>
+                    </Button>
+
+                    <TextBlock Text="{Binding StatusText}" Foreground="{StaticResource TextMutedBrush}"
+                               FontSize="{StaticResource FontSize14}" HorizontalAlignment="Center" Margin="0,10,0,0"/>
+
+                    <TextBlock Text="계정 문의: 관리자에게 연락" Foreground="{StaticResource TextMutedBrush}"
+                               FontSize="{StaticResource FontSize14}" HorizontalAlignment="Center" Margin="0,14,0,0"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Grid>
+</Window>

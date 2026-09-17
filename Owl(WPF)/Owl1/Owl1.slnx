@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Owl1Client/Owl1Client.csproj" />
+  <Project Path="Owl1DummyServer/Owl1DummyServer.csproj" />
+</Solution>
