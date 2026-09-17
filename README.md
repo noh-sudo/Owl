@@ -1,68 +1,85 @@
-# 올빼미(Owl-1) C# Main Server
+# 올빼미 하나 (Owl-1)
 
-`owl_csharp_server_plan.md`와 `올빼미 개발계획서/` 폴더의 개발계획서·API 명세서·테이블
-명세서·ERD를 기준으로 구현한 C# TCP 서버다. WPF 클라이언트, 아두이노, 라즈베리파이는
-이 저장소에 포함되어 있지 않다 - 서버만 구현 범위다.
+카메라 기반 반자동 추적 터렛 — 임베디드(아두이노) + 엣지 컴퓨팅 영상처리(라즈베리파이/YOLO) +
+Windows 서버/클라이언트(C#, WPF)를 하나의 통합 시스템으로 묶은 프로젝트입니다.
 
-**안전 범위**: 이 서버는 영상 중계, 객체 감지 로그 저장, 로그인 인증, 승인/중단
-*상태 기록*까지만 다룬다. 실제 발사 장치 제어 로직은 구현하지 않았다
-(`Hardware/ArduinoBridge.cs`는 LED/서보 테스트 장치용 상태 라벨만 보낸다).
+- **활동 기간**: 2026.09.09 ~ 2026.09.16
+- **장소**: 광주인력개발원
+- **팀원**: 김민건(아두이노) · 노창범(서버/DB) · 문승현(라즈베리파이/YOLO) · 원상우(WPF)
 
-## 요구사항
+## 안전 범위
 
-- .NET 10 SDK (이 머신에는 이미 설치되어 있음: `dotnet --version` → 10.0.401)
-- MySQL 서버 (이 머신은 localhost:3306에 떠 있고, `Owl` 데이터베이스와
-  `cam_log`/`u_info`/`shoot_log` 테이블도 이미 만들어져 있음을 확인함 - 아래 참고).
-  앱 전용 계정 `owlAdmin`을 만들어 `Owl.*`에 SELECT/INSERT만 GRANT해 두었다
-  (개발계획서 §14.1 최소 권한 원칙 - DELETE/DROP 등은 시도하면 거부되는 것까지
-  확인함). `root`는 관리용으로만 남겨두고 앱은 root를 쓰지 않는다.
+이 프로젝트는 영상 감시, 객체 탐지, 로그 기록, 운영자 승인/중단을 다룹니다.
+하드웨어 연동은 LED/서보모터 등 안전한 시험 대상을 기준으로 만들어졌습니다.
 
-## 빌드 / 실행
+## 시스템 구성
 
 ```
-cd OwlServer
-dotnet build
+[카메라] → [Raspberry Pi: YOLO 추론] → [C# Server] → [WPF Client] (영상 · 로그 · LED 상태)
+                                            ↓
+                                      [Arduino] (서보 추적, LED, 물리 버튼)
+                                            ↓
+                                        [MySQL]  (cam_log · u_info · shoot_log)
 ```
 
-`OwlServer/appsettings.json`은 호스트/포트/DB명/계정을 담고, 
-환경 변수 `OwlServer__MySql__Password`로만 전달한다:
+1. **라즈베리파이**가 카메라 영상을 캡처하고 YOLO(NCNN)로 사람/동물을 탐지·추적, 서버로 영상과 탐지 결과를 실시간 전송
+2. **C# 서버**가 라즈베리파이·WPF·아두이노 사이를 중계 — 영상 릴레이, DB 저장, 로그인 인증, 지속 추적 판단, 아두이노 시리얼 제어까지 전부 서버가 책임
+3. **WPF 클라이언트**가 관리자 로그인, 실시간 영상·로그·상태 LED를 화면에 띄우고, 운영자의 승인/중단 입력을 서버로 보냄
+4. **아두이노**가 서버로부터 좌표/상태를 받아 서보모터로 추적하고 LED·물리 버튼으로 로컬 상태를 표시
 
-```json
-{
-  "OwlServer": {
-    "MySql": {
-      "Host": "localhost",
-      "Port": 3306,
-      "Database": "Owl",
-      "UserId": "owlAdmin",
-      "SslMode": "Preferred"
-    }
-  }
-}
+## 기술 스택
+
+| 구성요소 | 언어/프레임워크 | 비고 |
+|---|---|---|
+| Raspberry Pi | Python, Ultralytics YOLO(NCNN), OpenCV, Picamera2 | `model.track(persist=True)`로 프레임 간 객체 추적(track_id) |
+| C# Server | C# / .NET 10, MySqlConnector, BCrypt.Net, System.IO.Ports | 순수 TCP 소켓 기반, ASP.NET 미사용 |
+| WPF Client | C# / .NET 8, WPF, MVVM | 로그인 → 영상/로그/상태 대시보드 |
+| Arduino | Arduino IDE (C++) | 서보 추적, 상태 LED, 물리 버튼 |
+| DB | MySQL 8 | `cam_log` / `u_info` / `shoot_log` |
+
+## 프로젝트 구조
+
+```
+Owl_project/
+├── OwlServer/          C# 메인 서버 (아래 "서버 세부 구조" 참고)
+├── Owl(WPF)/Owl1/
+│   ├── Owl1Client/      WPF 클라이언트 (MVVM: Views/ViewModels/Models/Services/Converters)
+│   └── Owl1DummyServer/ 서버 없이 WPF 단독 테스트용 더미 서버
+├── yolo_deploy/         라즈베리파이에서 돌아가는 Python 추론 + 서버 전송 스크립트
+├── sql/                 DB 스키마 참고 (서버는 DDL을 직접 실행하지 않음)
+└── dummy_data/          아두이노 좌표 재생 테스트용 더미 JSON
 ```
 
-실행 (PowerShell):
+### 서버 세부 구조 (`OwlServer/`)
 
-```powershell
-$env:OwlServer__MySql__Password = "<owlAdmin 비밀번호>"
-dotnet run
+```
+OwlServer/
+├── Program.cs               진입점, DI/Host 구성
+├── Config/                  appsettings.json 바인딩
+├── Network/                 TCP accept-loop, OWL1/OWLD framing, 세션 관리
+├── Models/                  DB 엔티티 + JSON 메시지 DTO
+├── Services/                DetectionService(감지·추적·LED 판단) / VideoService /
+│                            AuthenticationService / LogService / ClientBroadcastService
+├── Repository/              cam_log/u_info/shoot_log 접근 (SELECT/INSERT만)
+├── Hardware/                ArduinoBridge(TCP 상태 라벨) / ArduinoSerialBridge(시리얼 좌표·상태)
+├── Storage/ImageStorage.cs  최초 감지 프레임 파일 저장
+└── Utils/                   Logger, 시계 추상화
 ```
 
-Bash:
+### WPF 클라이언트 구조 (`Owl(WPF)/Owl1/Owl1Client/`)
 
-```bash
-OwlServer__MySql__Password=<owlAdmin 비밀번호> dotnet run
+```
+Owl1Client/
+├── Views/            LoginWindow(로그인), MainWindow(영상·로그·LED·사격/중단 버튼)
+├── ViewModels/        LoginViewModel, MainViewModel (MVVM 바인딩)
+├── Models/            NetworkMessages(서버 JSON 메시지 매핑), DetectionLogItem(로그 리스트 항목)
+├── Services/          ServerConnectionService(서버 TCP 연결), AppSettings, ImageHelper
+└── Converters/        LED/상태 표시용 값 변환기 (Bool→색상 등)
 ```
 
-이 머신에서 실제로 localhost:3306 `owlAdmin` 계정, `Owl` 데이터베이스에 연결해
-로그인/`cam_log` INSERT/`shoot_log` INSERT까지 전부 동작하는 것을 확인했다
-(아래 "확인한 것" 참고). `u_info`에는 관리자 계정 `admin` 1개(bcrypt 해시로
-저장, 평문 비밀번호는 여기 기록하지 않음)를 심어 두었다 - 실제 배포 전 이 계정을
-교체하거나 비밀번호를 바꿀 것. `owlAdmin`은 MySQL에서 `'owlAdmin'@'%'`로
-등록되어 있어 외부에서도 접속 가능하다 - 배포 환경에서는 접속 가능 호스트를
-특정 IP로 좁히고 비밀번호도 반드시 더 강하게 바꿀 것을 권장한다.
+## 통신 프로토콜
 
-## 포트 (API 명세서 기준)
+서버가 다루는 TCP 포트:
 
 | 포트 | 대상 | 방향 | 프로토콜 |
 |---|---|---|---|
@@ -70,56 +87,60 @@ OwlServer__MySql__Password=<owlAdmin 비밀번호> dotnet run
 | 5001 | Raspberry Pi (Video) | Pi → Server | OWL1 (JPEG) |
 | 6000 | WPF Client | 양방향 | OWL1(서버→WPF 영상) + OWLD(양방향 JSON) |
 | 6001 | Arduino/Test Hardware | Server → Hardware | OWLD (상태 라벨만) |
+| (COM 포트) | Arduino | Server → Arduino | 시리얼, `POS,x,y` / `DEC,APPROVED\|STOPPED` |
 
-## 프로젝트 구조
+두 가지 length-prefix 프레이밍을 사용합니다.
 
-`owl_csharp_server_plan.md` 12절의 구조를 그대로 따랐다:
+- **OWL1** (영상): `Magic("OWL1", 4B)` + `PayloadSize(4B BE)` + `JPEG bytes` — 매 프레임, 유실 허용
+- **OWLD** (JSON ± blob): `Magic("OWLD", 4B)` + `JsonSize(4B BE)` + `BlobSize(4B BE)` + `JSON(UTF-8)` + `Blob` — 제어/이벤트 메시지, 유실 불가
 
+주요 JSON 메시지 타입:
+
+| type | 방향 | 용도 |
+|---|---|---|
+| `login` / `login_result` | WPF ↔ Server | 관리자 로그인 |
+| `detection_event` | Pi → Server | 최초 감지 1회 — `cam_log` 저장용 (이미지 포함) |
+| `tracking_coordinate` | Pi → Server | 감지되어 있는 동안 계속(기본 12Hz) — 아두이노 실시간 추적용, track_id 포함 |
+| `detection_log` | Server → WPF | `cam_log` 저장 후 로그 브로드캐스트 (LED 노란색 트리거) |
+| `change_led` | Server → WPF | 같은 track_id N초(기본 2초) 지속 시 `red`, 추적 끊기면(기본 3초) `green` |
+| `decision` | WPF → Server | 운영자 승인/중단 (`shoot_log` 기록, 실제 발사 명령 아님) |
+| `system_status` | Server → WPF | 카메라/Pi/아두이노 연결 상태 |
+| `hw_state` | Server → Arduino(TCP) | `idle`/`detected`/`approved`/`stopped` 상태 라벨 |
+
+## DB 스키마
+
+MySQL에 사전에 만들어져 있어야 하며(`sql/schema.sql` 참고), 서버는 SELECT/INSERT만
+수행한다 (DDL 직접 실행 안 함).
+
+- **`cam_log`**: 감지 로그 (`l_id`, `category`, `thumbnail` 경로, `created_at`)
+- **`u_info`**: 관리자 계정 (`u_id`, `u_name`, `pw` — bcrypt 해시)
+- **`shoot_log`**: 승인/중단 기록 (`s_id`, `u_id`, `l_id`, `is_shoot`, `created_at`)
+
+## 빌드 / 실행
+
+### C# 서버
+
+```bash
+cd OwlServer
+dotnet build
 ```
-OwlServer/
-├── Program.cs              진입점, DI/Host 구성
-├── Config/                 appsettings.json 바인딩
-├── Network/                TCP accept-loop, OWL1/OWLD framing, 세션 관리
-├── Models/                 DB 엔티티 + JSON 메시지 DTO
-├── Services/                DetectionService/VideoService/AuthenticationService/
-│                           LogService/ClientBroadcastService
-├── Repository/              cam_log/u_info/shoot_log 접근 (SELECT/INSERT만)
-├── Hardware/ArduinoBridge.cs 안전 시험용 하드웨어 상태 브릿지
-├── Storage/ImageStorage.cs  최초 감지 프레임 파일 저장
-└── Utils/                   Logger, 시계 추상화
+
+`appsettings.json`에 호스트/포트/DB 계정을 담습니다. 해당 json은 직접 전달합니다.
+
+```powershell
+dotnet restore
+dotnet run
 ```
 
-## 설계 메모
+### 라즈베리파이 (Python)
 
-- **TCP framing**: 모든 패킷은 length-prefix 방식이다. 영상은
-  `Magic("OWL1") + PayloadSize(4B BE) + JPEG`, JSON/제어 메시지는
-  `Magic("OWLD") + JsonSize(4B BE) + BlobSize(4B BE) + JSON + Blob`
-  (`Network/PacketProtocol.cs`).
-- **WPF 소켓은 하나의 연결에 영상+메시지를 함께 흘린다.** 영상은 클라이언트별
-  capacity-1 + DropOldest 채널로 큐잉해 느린 클라이언트가 다른 클라이언트를
-  막지 않게 했고(개발계획서 §21), 로그인/로그 메시지는 유실되면 안 되므로
-  별도의 무제한 채널로 큐잉한다(`Network/WpfClientSession.cs`).
-- **감지 이벤트 파이프라인**: 첫 감지 프레임을 파일로 저장 → 성공 시에만
-  `cam_log` INSERT(트랜잭션) → 성공 시에만 WPF에 로그 브로드캐스트 + 시험용
-  하드웨어에 상태 전달. DB 오류는 로그만 남기고 해당 소켓을 끊지 않는다
-  (개발계획서 §16, §26).
-- **비밀번호**: `u_info.pw`는 항상 bcrypt 해시. 로그인 시 DB 조회가 실패해도
-  (예: MySQL 다운) 연결을 끊지 않고 `login_result: false`를 반환한다.
+```bash
+cd yolo_deploy
+pip install picamera2 ultralytics ncnn opencv-python
+python realtime_detect.py --model best_ncnn_model --no-preview --server-host <서버IP>
+```
 
+### WPF 클라이언트
 
-## 확인한 것 / 확인하지 못한 것
-
-로컬 `Owl` 데이터베이스(localhost:3306, owlAdmin)에 실제로 연결해서:
-
-- 4개 TCP 리스너 기동
-- OWL1 영상 릴레이 (Pi→Server→WPF, 바이트 단위 일치 확인)
-- 로그인 성공/실패 양쪽 경로 (`u_info` 실제 SELECT + bcrypt 검증)
-- 감지 이벤트 파이프라인: 파일 저장 → `cam_log` 실제 INSERT → WPF 로그 브로드캐스트
-- 운영자 승인 결정: `shoot_log` 실제 INSERT (u_id/l_id FK까지 정상 연결 확인)
-- 아두이노 브리지 idle 상태 전송, DB 다운 시에도 연결을 끊지 않고 로그만 남기는
-  것까지 확인했다.
-
-테스트에 쓴 행은 정리했고, `admin` 계정만 남겨 두었다. `owlAdmin`이 SELECT/INSERT는
-되지만 DELETE/DROP은 거부되는 것도 실제로 확인했다. WPF/아두이노/라즈베리파이
-실제 클라이언트와의 통합, 부하 상황에서의 프레임 드롭 정책은 아직 테스트하지
-않았다.
+`Owl(WPF)/Owl1/Owl1Client`를 Visual Studio로 열어 빌드/실행합니다. 서버 없이 UI만
+테스트하려면 `Owl1DummyServer`를 먼저 띄우면 됩니다.
