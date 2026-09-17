@@ -1,6 +1,6 @@
-description: Ultralytics YOLO11n model trained on data_small.yaml
+description: Ultralytics YOLO11n model trained on data.yaml
 author: Ultralytics
-date: '2026-09-11T10:41:44.132628+09:00'
+date: '2026-09-16T14:56:25.898643+09:00'
 version: 8.4.146
 license: AGPL-3.0 License (https://ultralytics.com/license)
 docs: https://docs.ultralytics.com
