@@ -46,6 +46,7 @@ Owl_project/
 │   ├── Owl1Client/      WPF 클라이언트 (MVVM: Views/ViewModels/Models/Services/Converters)
 │   └── Owl1DummyServer/ 서버 없이 WPF 단독 테스트용 더미 서버
 ├── yolo_deploy/         라즈베리파이에서 돌아가는 Python 추론 + 서버 전송 스크립트
+├── OwlArduino/          아두이노 스케치 (mk.3.ino - 서보 3개·조이스틱·LED·부저, POS/DEC 명령 처리)
 ├── sql/                 DB 스키마 참고 (서버는 DDL을 직접 실행하지 않음)
 └── dummy_data/          아두이노 좌표 재생 테스트용 더미 JSON
 ```
@@ -110,7 +111,7 @@ Owl1Client/
 ## DB 스키마
 
 MySQL에 사전에 만들어져 있어야 하며(`sql/schema.sql` 참고), 서버는 SELECT/INSERT만
-수행한다 (DDL 직접 실행 안 함).
+수행합니다 (DDL 직접 실행 안 함).
 
 - **`cam_log`**: 감지 로그 (`l_id`, `category`, `thumbnail` 경로, `created_at`)
 - **`u_info`**: 관리자 계정 (`u_id`, `u_name`, `pw` — bcrypt 해시)
