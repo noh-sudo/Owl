@@ -1,0 +1,140 @@
+<Window x:Class="Owl1Client.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        mc:Ignorable="d"
+        Title="올빼미 하나 - 터렛 관제 시스템"
+        Height="800" Width="1280" MinHeight="600" MinWidth="960"
+        WindowStartupLocation="CenterScreen"
+        FontFamily="Segoe UI"
+        Background="{StaticResource AppBackgroundBrush}">
+
+    <Grid Margin="20">
+        <!-- 바깥 카드 하나 안에 좌(CCTV) / 우(로그+LED+버튼) 2분할 -->
+        <Border Style="{StaticResource CardBorderStyle}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="3*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="380" MinWidth="320"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- 좌측: 실시간 CCTV 영상 -->
+                <Border Grid.Column="0" Background="White" BorderBrush="#E2E2DB" BorderThickness="1"
+                        CornerRadius="6" ClipToBounds="True">
+                    <Grid>
+                        <Image Source="{Binding CurrentFrame}" Stretch="UniformToFill"/>
+
+                        <TextBlock Text="영상 신호 없음" Foreground="{StaticResource TextMutedBrush}" FontSize="{StaticResource FontSize22}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Visibility="{Binding CurrentFrame, Converter={StaticResource NullToVisibilityConverter}, ConverterParameter=Invert}"/>
+
+                        <!-- 좌하단 타임스탬프: 영상이 비활성 상태(정지/미수신)일 때는
+                             시계만 흘러 실시간처럼 보이지 않도록 같이 숨긴다. -->
+                        <Border Background="#A0000000" CornerRadius="4" Padding="8,4"
+                                HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="12"
+                                Visibility="{Binding IsVideoActive, Converter={StaticResource BoolToVisibilityConverter}}">
+                            <TextBlock Text="{Binding TimestampOverlay}" Foreground="White" FontFamily="Consolas" FontSize="{StaticResource FontSize18}"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- 우측: 로그 패널 + 상태 LED + 사격/중단 버튼 -->
+                <Grid Grid.Column="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- 실시간 인식 로그 (다크 네이비/블랙 패널) -->
+                    <Border Grid.Row="0" Background="{StaticResource LogPanelBrush}" CornerRadius="6" Padding="16">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Text="실시간 인식 로그" FontSize="{StaticResource FontSize20}" FontWeight="Bold"
+                                       Foreground="#E8E8E0" Margin="0,0,0,10"/>
+
+                            <ListBox Grid.Row="1" ItemsSource="{Binding DetectionLogs}" SelectedItem="{Binding SelectedLog}"
+                                     BorderThickness="0" Background="Transparent">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Setter Property="Foreground" Value="White"/>
+                                        <Setter Property="Padding" Value="8,7"/>
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                                        <!-- 사격승인/사격중단 액션 로그(IsSelectable=false)는 재선택해서
+                                             같은 l_id로 결정을 중복 전송할 수 없도록 선택 자체를 막는다. -->
+                                        <Setter Property="IsEnabled" Value="{Binding IsSelectable}"/>
+                                        <Setter Property="Template">
+                                            <Setter.Value>
+                                                <ControlTemplate TargetType="ListBoxItem">
+                                                    <Border x:Name="ItemBorder" Background="{TemplateBinding Background}"
+                                                            CornerRadius="4" Padding="{TemplateBinding Padding}">
+                                                        <ContentPresenter/>
+                                                    </Border>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsSelected" Value="True">
+                                                            <Setter TargetName="ItemBorder" Property="Background" Value="{StaticResource OliveAccentBrush}"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Setter TargetName="ItemBorder" Property="Background" Value="#22FFFFFF"/>
+                                                        </Trigger>
+                                                        <Trigger Property="IsEnabled" Value="False">
+                                                            <Setter TargetName="ItemBorder" Property="Opacity" Value="0.55"/>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding DisplayText}" FontSize="{StaticResource FontSize18}" TextWrapping="Wrap"/>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+                    </Border>
+
+                    <!-- 상태 LED 3종: 평상시 / 움직임 감지 / 추적 -->
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,16,0,16">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,22,0">
+                            <Ellipse Style="{StaticResource LedStyle}" Margin="0,0,6,0"
+                                     Fill="{Binding IsIdleLed, Converter={StaticResource BoolToLedBrushConverter}, ConverterParameter=SuccessGreenBrush}"/>
+                            <TextBlock Text="평상시" FontSize="{StaticResource FontSize16}" VerticalAlignment="Center" Foreground="{StaticResource TextDarkBrush}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,22,0">
+                            <Ellipse Style="{StaticResource LedStyle}" Margin="0,0,6,0"
+                                     Fill="{Binding IsDetectedLed, Converter={StaticResource BoolToLedBrushConverter}, ConverterParameter=WarningYellowBrush}"/>
+                            <TextBlock Text="움직임 감지" FontSize="{StaticResource FontSize16}" VerticalAlignment="Center" Foreground="{StaticResource TextDarkBrush}"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Style="{StaticResource LedStyle}" Margin="0,0,6,0"
+                                     Fill="{Binding IsLockedOn, Converter={StaticResource BoolToLedBrushConverter}, ConverterParameter=DangerRedBrush}"/>
+                            <TextBlock Text="추적" FontSize="{StaticResource FontSize16}" VerticalAlignment="Center" Foreground="{StaticResource TextDarkBrush}"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- 사격 / 중단 -->
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0" Content="사격" Style="{StaticResource FireOutlineButtonStyle}"
+                                Command="{Binding FireCommand}"/>
+                        <Button Grid.Column="2" Content="추적 해제" Style="{StaticResource CeaseOutlineButtonStyle}"
+                                Command="{Binding CeaseFireCommand}"/>
+                    </Grid>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>
